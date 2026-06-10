@@ -10,6 +10,15 @@ import os
 from collections import defaultdict
 from datetime import datetime
 
+import requests
+from dotenv import load_dotenv
+
+# Load Telegram credentials from .env
+load_dotenv()
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+TELEGRAM_ENABLED = bool(TELEGRAM_TOKEN and TELEGRAM_CHAT_ID)
+
 # ANSI color codes for terminal output
 RED = '\033[91m'
 YELLOW = '\033[93m'
@@ -30,9 +39,37 @@ AUTH_LOG = '/var/log/auth.log'
 KERN_LOG = '/var/log/kern.log'
 ALERT_FILE = '/home/kali/mini-soc/alerts.log'  # adjust path if needed
 
+def send_telegram_alert(severity, message):
+    """Push alert to Telegram"""
+    if not TELEGRAM_ENABLED:
+        return
+    
+    # Emoji based on severity
+    emoji = '🚨' if severity == 'CRITICAL' else '⚠️'
+    
+    # Formatted message with Markdown
+    text = (
+        f"{emoji} *Mini SOC Alert*\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"*Severity:* `{severity}`\n"
+        f"*Time:* `{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}`\n"
+        f"*Event:*\n{message}"
+    )
+    
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    payload = {
+        'chat_id': TELEGRAM_CHAT_ID,
+        'text': text,
+        'parse_mode': 'Markdown'
+    }
+    
+    try:
+        requests.post(url, data=payload, timeout=5)
+    except Exception as e:
+        print(f"{YELLOW}[!] Telegram send failed: {e}{RESET}")
 
 def write_alert(severity, message):
-    """Write alert to file + print to terminal"""
+    """Write alert to file + print to terminal + send to Telegram"""
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     alert = f"[{timestamp}] [{severity}] {message}"
     
@@ -43,6 +80,9 @@ def write_alert(severity, message):
     # Write to alerts file
     with open(ALERT_FILE, 'a') as f:
         f.write(alert + '\n')
+
+    # NEW: Push to Telegram
+    send_telegram_alert(severity, message)
 
 
 def check_failed_logins(ip):
