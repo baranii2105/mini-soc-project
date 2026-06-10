@@ -1,0 +1,19 @@
+services:
+  mini-soc:
+    build: .
+    container_name: mini-soc-detector
+    volumes:
+      - /var/log/auth.log:/var/log/auth.log:ro
+      - /var/log/kern.log:/var/log/kern.log:ro
+      - ./alerts.log:/app/alerts.log
+    restart: unless-stopped
+
+  dashboard:
+    build: .
+    container_name: mini-soc-dashboard
+    command: ["python3", "-u", "dashboard.py"]
+    volumes:
+      - ./alerts.log:/app/alerts.log:ro
+    depends_on:
+      - mini-soc
+
