@@ -27,7 +27,7 @@ RESET = '\033[0m'
 
 # Detection thresholds
 FAILED_LOGIN_THRESHOLD = 3      # alert after 3 failed logins
-PORTSCAN_THRESHOLD = 10         # alert after 10 connection attempts
+PORTSCAN_THRESHOLD = 3         # alert after 10 connection attempts
 TIME_WINDOW = 60                # within 60 seconds
 
 # Tracking dictionaries
@@ -136,6 +136,38 @@ def parse_kern_line(line):
             check_port_scan(ip)
 
 
+def parse_cowrie_docker_line(line):
+    """Parse real time docker log lines from Cowrie"""
+    ip_match = re.search(r'\[HoneyPotSSHTransport,\d+,(\S+)\]', line)
+    ip = ip_match.group(1) if ip_match else 'unknown'
+
+    if 'login attempt' in line:
+        user_match = re.search(r"\[b'(\S+)'/b'(\S+)'\]", line)
+        if user_match:
+            user, pwd = user_match.groups()
+            print(f"{YELLOW}[HONEYPOT] Login attempt: user={user} ip={ip}{RESET}")
+            check_failed_logins(ip)
+
+    elif 'CMD:' in line:
+        cmd_match = re.search(r'CMD: (.+)', line)
+        if cmd_match:
+            cmd = cmd_match.group(1)
+            write_alert('CRITICAL', f"[SOURCE: honeypot] Command on honeypot from {ip}: {cmd}")
+
+def monitor_cowrie_docker():
+    """Read Cowrie logs in real time from docker logs"""
+    import subprocess
+    print(f"{GREEN}[+] Monitoring Cowrie via docker logs (real time){RESET}")
+    process = subprocess.Popen(
+        ['docker', 'logs', '-f', '--tail', '0', 'cowrie'],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True
+    )
+    for line in process.stdout:
+        parse_cowrie_docker_line(line.strip())
+
+
 def follow(filepath):
     """Generator that yields new lines as they're added (like tail -f)"""
     with open(filepath, 'r') as f:
@@ -169,9 +201,12 @@ def main():
     
     t1 = threading.Thread(target=monitor_file, args=(AUTH_LOG, parse_auth_line), daemon=True)
     t2 = threading.Thread(target=monitor_file, args=(KERN_LOG, parse_kern_line), daemon=True)
+    t3 = threading.Thread(target=monitor_cowrie_docker, daemon=True)
+    
     
     t1.start()
     t2.start()
+    t3.start()
     
     try:
         while True:

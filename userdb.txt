@@ -1,0 +1,14 @@
+root:x:123456
+root:x:password
+root:x:admin
+root:x:toor
+root:x:root
+root:x:!*
+admin:x:admin
+admin:x:password
+admin:x:123456
+admin:x:!*
+ubuntu:x:ubuntu
+ubuntu:x:!*
+pi:x:raspberry
+pi:x:!*

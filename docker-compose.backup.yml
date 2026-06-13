@@ -17,14 +17,3 @@ services:
     depends_on:
       - mini-soc
 
-  cowrie:
-    image: cowrie/cowrie:latest
-    container_name: cowrie
-    ports:
-      - "2222:2222"
-    restart: unless-stopped
-    environment:
-      - COWRIE_OUTPUT_JSONLOG=yes
-    volumes:
-      - ./cowrie-logs:/cowrie/cowrie-git/var/log
-      - ./userdb.txt:/cowrie/cowrie-git/etc/userdb.txt
